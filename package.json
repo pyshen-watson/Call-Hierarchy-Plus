@@ -60,7 +60,7 @@
         {
           "id": "chp-explorer",
           "title": "Call Hierarchy Plus",
-          "icon": "$(references)"
+          "icon": "media/sidebar-icon.svg"
         }
       ]
     },
