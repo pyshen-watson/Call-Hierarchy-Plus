@@ -1,26 +1,59 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
+import { CallHierarchyPlusProvider } from './hierarchyProvider';
+import { HierarchyItem } from './models';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
+    console.log('--- CHP Extension is Activating ---');
+    const treeProvider = new CallHierarchyPlusProvider();
+    vscode.window.registerTreeDataProvider('chpView', treeProvider);
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "call-hierarchy-plus" is now active!');
+    let disposable = vscode.commands.registerCommand('call-hierarchy-plus.run', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) return;
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('call-hierarchy-plus.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hi from call-hierarchy-plus!');
-	});
+        const doc = editor.document;
+        const pos = editor.selection.active;
+        const wordRange = doc.getWordRangeAtPosition(pos);
+        const functionName = wordRange ? doc.getText(wordRange) : '';
 
-	context.subscriptions.push(disposable);
+        try {
+            const items = await vscode.commands.executeCommand<vscode.CallHierarchyItem[]>(
+                'vscode.prepareCallHierarchy',
+                doc.uri,
+                pos
+            );
+
+            if (items && items.length > 0) {
+				const cleanName = items[0].name.split('(')[0].trim();
+                const rootItem = new HierarchyItem(
+                    cleanName,
+                    items[0].uri,
+                    items[0].selectionRange,
+                    'root',
+                    items[0].detail,
+                    items[0]
+                );
+                treeProvider.refresh(rootItem);
+                await vscode.commands.executeCommand('chpView.focus');
+            } else if (functionName) {
+                // Fallback: If built-in hierarchy fails, still create a root for our search
+                console.log(`[CHP] Built-in hierarchy failed. Using fallback for ${functionName}`);
+                const fallbackRoot = new HierarchyItem(
+                    functionName,
+                    doc.uri,
+                    wordRange!,
+                    'root',
+                    'Fallback (No built-in data)'
+                );
+                treeProvider.refresh(fallbackRoot);
+                await vscode.commands.executeCommand('chpView.focus');
+            } else {
+                vscode.window.showErrorMessage('Please place cursor on a function name.');
+            }
+        } catch (err) {
+            console.error('CHP Command Error:', err);
+        }
+    });
+
+    context.subscriptions.push(disposable);
 }
-
-// This method is called when your extension is deactivated
-export function deactivate() {}
