@@ -8,8 +8,10 @@ export class CallHierarchyPlusProvider implements vscode.TreeDataProvider<Hierar
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
     private root: HierarchyItem | null = null;
 
-    refresh(newRoot: HierarchyItem): void {
-        this.root = newRoot;
+    refresh(newRoot?: HierarchyItem): void {
+        if (newRoot) {
+            this.root = newRoot;
+        }
         this._onDidChangeTreeData.fire();
     }
 

@@ -7,7 +7,20 @@ export function activate(context: vscode.ExtensionContext) {
     const treeProvider = new CallHierarchyPlusProvider();
     vscode.window.registerTreeDataProvider('chpView', treeProvider);
 
-    let disposable = vscode.commands.registerCommand('call-hierarchy-plus.run', async () => {
+    context.subscriptions.push(
+        vscode.commands.registerCommand('call-hierarchy-plus.refresh', () => {
+            treeProvider.refresh();
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('call-hierarchy-plus.collapseAll', () => {
+            vscode.commands.executeCommand('workbench.actions.treeView.chpView.collapseAll');
+        })
+    );
+
+
+    let runDisposable = vscode.commands.registerCommand('call-hierarchy-plus.run', async () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {return};
 
@@ -60,5 +73,5 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(disposable);
+    context.subscriptions.push(runDisposable);
 }

@@ -10,32 +10,33 @@ export class HierarchyItem extends vscode.TreeItem {
         public readonly range: vscode.Range,
         public readonly type: HierarchyType,
         public readonly descriptionText?: string,
-        // Store the original CallHierarchyItem for nested lookups
         public readonly rawCallItem?: vscode.CallHierarchyItem 
     ) {
         super(label, vscode.TreeItemCollapsibleState.Collapsed);
 
         this.resourceUri = uri;
         this.description = descriptionText || '';
-        this.tooltip = `[${type.toUpperCase()}] ${symbolName}`;
+        // this.tooltip = `[${type.toUpperCase()}] ${symbolName}`;
         
         // Visual distinction between direct calls and pointer assignments
         if (type === 'root') {
-            this.iconPath = new vscode.ThemeIcon('symbol-function');
-            this.contextValue = 'root';
+            this.iconPath = new vscode.ThemeIcon('symbol-function'); // 根節點：藍色函數
         } else if (type === 'call') {
-            this.iconPath = new vscode.ThemeIcon('call-incoming');
-            this.contextValue = 'call';
-        } else {
-            this.iconPath = new vscode.ThemeIcon('link-external'); // Assignment icon
-            this.contextValue = 'assignment';
+            this.iconPath = new vscode.ThemeIcon('call-incoming');   // 直接呼叫：綠色箭頭
+        } else if (type === 'assignment') {
+            this.iconPath = new vscode.ThemeIcon('link-external');   // 指標賦值：橘色連結
         }
 
-        // Clicking the item opens the file at the specific line
         this.command = {
             command: 'vscode.open',
             title: 'Open Location',
-            arguments: [uri, { selection: range }]
+            arguments: [
+                uri, 
+                { 
+                    selection: range, // 這會選中整行或我們計算的精確範圍
+                    preserveFocus: false 
+                }
+            ]
         };
     }
 }
