@@ -34,12 +34,15 @@ export class CallHierarchyPlusProvider implements vscode.TreeDataProvider<Hierar
     private async getFunctionChildren(element: HierarchyItem): Promise<HierarchyItem[]> {
         const results: HierarchyItem[] = [];
 
+        console.log(`\n[CHP Provider] 🔽 展開節點: ${element.label} (Type: ${element.type})`);
+
         // 1. Process standard incoming calls
         if (element.rawCallItem) {
             const incoming = await vscode.commands.executeCommand<vscode.CallHierarchyIncomingCall[]>(
                 'vscode.provideIncomingCalls',
                 element.rawCallItem
             );
+            
             incoming?.forEach(call => {
                 const name = call.from.name.split('(')[0];
                 const exactCallRange = (call.fromRanges && call.fromRanges.length > 0) 
@@ -59,7 +62,10 @@ export class CallHierarchyPlusProvider implements vscode.TreeDataProvider<Hierar
         }
 
         // 2. Process pointer assignments (The "Bridge" registration)
-        const assignments = await findPointerAssignments(element.symbolName, element.uri, element.range.start);
+        const searchPos = element.rawCallItem ? element.rawCallItem.selectionRange.start : element.range.start;
+        console.log(`[CHP Provider] 🔍 修正後的精確搜尋起點 (Declaration Line): ${searchPos.line}`);
+        
+        const assignments = await findPointerAssignments(element.symbolName, element.uri, searchPos);
         results.push(...assignments);
 
         return results;

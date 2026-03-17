@@ -45,6 +45,11 @@ function extractLhsFromContext(document: vscode.TextDocument, refPos: vscode.Pos
     const eqIndex = textBlock.lastIndexOf('=');
     if (eqIndex === -1) return null;
 
+    const rightSide = textBlock.substring(eqIndex + 1);
+    if (!/^[\s&]*(?:\([^)]+\)[\s&]*)?$/.test(rightSide)) {
+        return null; // 這是別人的等號，直接忽略！
+    }
+
     const leftSide = textBlock.substring(0, eqIndex).trim();
 
     // 4a. 處理片段特徵：C 語言複雜函數指標
@@ -70,6 +75,10 @@ function extractLhsFromContext(document: vscode.TextDocument, refPos: vscode.Pos
 }
 
 export async function findPointerAssignments(functionName: string, uri: vscode.Uri, position: vscode.Position): Promise<HierarchyItem[]> {
+    console.log(`[CHP SearchEngine] 🚀 執行 findPointerAssignments`);
+    console.log(`  - 目標函式: ${functionName}`);
+    console.log(`  - 搜尋起點 (Line): ${position.line}, (Char): ${position.character}`);
+
     const assignments: HierarchyItem[] = [];
     const target = cleanName(functionName);
     
