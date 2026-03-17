@@ -4,7 +4,10 @@
   "description": "Enhanced call hierarchy for C/C++ projects. Bridges the gap between direct function calls and indirect pointer assignments/callbacks.",
   "version": "1.0.0",
   "publisher": "pyshen",
-  "repository": "https://github.com/pyshen-watson/Call-Hierarchy-Plus",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pyshen-watson/Call-Hierarchy-Plus"
+  },
   "icon": "media/sidebar-icon.png",
   "engines": {
     "vscode": "^1.106.0"

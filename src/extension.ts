@@ -52,7 +52,7 @@ function createRootItem(item: vscode.CallHierarchyItem): HierarchyItem {
 /**
  * Fallback logic for when the built-in C/C++ engine fails to recognize a symbol.
  */
-function handleFallback(editor: vscode.window.TextEditor, provider: CallHierarchyPlusProvider): void {
+function handleFallback(editor: vscode.TextEditor, provider: CallHierarchyPlusProvider): void {
     const wordRange = editor.document.getWordRangeAtPosition(editor.selection.active);
     if (wordRange) {
         const name = editor.document.getText(wordRange).split('(')[0].trim();
