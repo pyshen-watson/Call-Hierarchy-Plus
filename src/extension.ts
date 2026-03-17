@@ -3,22 +3,17 @@ import { CallHierarchyPlusProvider } from './hierarchyProvider';
 import { HierarchyItem } from './models';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('[CHP] Extension Activating...');
-    
     const treeProvider = new CallHierarchyPlusProvider();
     vscode.window.registerTreeDataProvider('chpView', treeProvider);
 
-    // Command: Refresh Tree View
     const refreshDisposable = vscode.commands.registerCommand('call-hierarchy-plus.refresh', () => {
         treeProvider.refresh();
     });
 
-    // Command: Collapse All Nodes
     const collapseDisposable = vscode.commands.registerCommand('call-hierarchy-plus.collapseAll', () => {
         vscode.commands.executeCommand('workbench.actions.treeView.chpView.collapseAll');
     });
 
-    // Command: Run Call Hierarchy Plus
     const runDisposable = vscode.commands.registerCommand('call-hierarchy-plus.run', async () => {
         const editor = vscode.window.activeTextEditor;
         if (!editor) return;

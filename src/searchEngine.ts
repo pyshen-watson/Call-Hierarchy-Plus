@@ -9,12 +9,12 @@ function cleanName(name: string): string {
 }
 
 /**
- * 從原本的 reference 位置往上回溯，精準定位 LHS 變數在文件中的真實 Range
+ * Finds the exact range of the LHS variable by searching upwards from the reference position.
  */
 function getExactLhsRange(document: vscode.TextDocument, lhs: string, refPos: vscode.Position): vscode.Range {
     const startLine = Math.max(0, refPos.line - 5);
 
-    // 🚀 加入 \b 單字邊界防護：避免 indexOf 誤將 RHS 的前綴當作 LHS
+    // Add word boundary to prevent matching prefixes of RHS variables
     const regex = new RegExp(`\\b${lhs}\\b`);
     
     for (let line = refPos.line; line >= startLine; line--) {
@@ -29,42 +29,39 @@ function getExactLhsRange(document: vscode.TextDocument, lhs: string, refPos: vs
 }
 
 /**
- * 透過上下文視窗反向解析 LHS (指標名稱)
+ * Extracts LHS from context window to handle multi-line declarations.
  */
 function extractLhsFromContext(document: vscode.TextDocument, refPos: vscode.Position): string | null {
-    // 1. 往前抓取 5 行作為上下文，解決跨行宣告問題
+    // 1. Fetch up to 5 lines of context
     const startLine = Math.max(0, refPos.line - 5);
     const range = new vscode.Range(startLine, 0, refPos.line, refPos.character);
     let textBlock = document.getText(range);
 
-    // 2. 壓平字串：清除換行符號與多餘空白，消滅多行造成的斷層
+    // 2. Flatten string to handle multi-line gaps
     textBlock = textBlock.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ');
 
-    // 3. 定位等號
+    // 3. Locate the assignment operator
     const eqIndex = textBlock.lastIndexOf('=');
     if (eqIndex === -1) return null;
 
+    // Ensure the right side does not belong to another statement
     const rightSide = textBlock.substring(eqIndex + 1);
     if (!/^[\s&]*(?:\([^)]+\)[\s&]*)?$/.test(rightSide)) {
-        return null; // 這是別人的等號，直接忽略！
+        return null; 
     }
 
     const leftSide = textBlock.substring(0, eqIndex).trim();
 
-    // 4a. 處理片段特徵：C 語言複雜函數指標
-    // 特徵：等號左邊最後一個字元是 ')'，例如 void (*fp)(int, int)
+    // 4a. Handle complex C function pointers (e.g., void (*fp)(int, int))
     if (leftSide.endsWith(')')) {
-        // 這裡只針對已經確認是函數宣告的局部字串做輕量正則萃取
         const match = leftSide.match(/\(\s*\*\s*([a-zA-Z0-9_]+)\s*\)\s*\([^)]*\)$/);
         if (match) return match[1];
     }
 
-    // 4b. 處理片段特徵：一般賦值或結構體初始化
-    // 特徵：結尾是變數名稱，例如 ptr 或 ops.ptr
-    const words = leftSide.split(/[\s,({]+/); // 避開前面的型別或關鍵字
+    // 4b. Handle standard assignments or struct initialization
+    const words = leftSide.split(/[\s,({]+/); 
     const lastWord = words[words.length - 1];
     
-    // 過濾掉指標的 '&' 或 '*' 符號
     const cleanWord = lastWord.replace(/[&*]/g, '');
     if (/^[a-zA-Z0-9_.]+$/.test(cleanWord)) {
         return cleanWord;
@@ -74,10 +71,6 @@ function extractLhsFromContext(document: vscode.TextDocument, refPos: vscode.Pos
 }
 
 export async function findPointerAssignments(functionName: string, uri: vscode.Uri, position: vscode.Position): Promise<HierarchyItem[]> {
-    console.log(`[CHP SearchEngine] 🚀 執行 findPointerAssignments`);
-    console.log(`  - 目標函式: ${functionName}`);
-    console.log(`  - 搜尋起點 (Line): ${position.line}, (Char): ${position.character}`);
-
     const assignments: HierarchyItem[] = [];
     const target = cleanName(functionName);
     
@@ -86,19 +79,16 @@ export async function findPointerAssignments(functionName: string, uri: vscode.U
 
     for (const loc of references) {
         const doc = await vscode.workspace.openTextDocument(loc.uri);
-        
-        // 使用上下文解析法萃取 LHS
         const lhs = extractLhsFromContext(doc, loc.range.start);
 
         if (lhs) {
-            // 替換這裡：使用精準定位取得真實的 Range
             const exactRange = getExactLhsRange(doc, lhs, loc.range.start);
 
             assignments.push(new HierarchyItem(
                 lhs,
                 lhs,
                 loc.uri,
-                exactRange, // 傳入修正後的精確 Range
+                exactRange, 
                 'assignment',
                 `(Assign) ${lhs} = ${target}`
             ));
@@ -115,7 +105,7 @@ export async function findPointerCalls(symbolName: string, uri: vscode.Uri, posi
     const doc = await vscode.workspace.openTextDocument(uri);
     const lineText = doc.lineAt(position.line).text;
     
-    // 🚀 防護網：確保尋找引用時的起點，是獨立的單字，而不是某個長變數的前綴
+    // Ensure search origin is an independent word
     const exactWordRegex = new RegExp(`\\b${targetSymbol}\\b`);
     const match = lineText.match(exactWordRegex);
     
@@ -132,12 +122,11 @@ export async function findPointerCalls(symbolName: string, uri: vscode.Uri, posi
     for (const loc of references) {
         const refDoc = await vscode.workspace.openTextDocument(loc.uri);
         
-        // 🚀 建立上下文視窗：往下抓取 3 行，涵蓋 Link Layer 超長參數導致的跨行呼叫
+        // Context window of 3 lines to handle multi-line arguments
         const endLine = Math.min(refDoc.lineCount - 1, loc.range.start.line + 3);
         const contextRange = new vscode.Range(loc.range.start.line, 0, endLine, 1000);
         let contextText = refDoc.getText(contextRange);
         
-        // 壓平字串，消滅換行符號帶來的 Regex 斷層
         contextText = contextText.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ');
 
         if (callRegex.test(contextText)) {

@@ -20,7 +20,7 @@
     "commands": [
       {
         "command": "call-hierarchy-plus.run",
-        "title": "CHP: Show Call Hierarchy Plus",
+        "title": "Show Call Hierarchy (Enhanced)",
         "category": "Call Hierarchy Plus"
       },
       {
@@ -32,6 +32,14 @@
         "command": "call-hierarchy-plus.collapseAll",
         "title": "Collapse All",
         "icon": "$(collapse-all)"
+      }
+    ],
+    "keybindings": [
+      {
+          "command": "call-hierarchy-plus.run",
+          "key": "ctrl+shift+c",
+          "mac": "cmd+shift+c",
+          "when": "editorTextFocus && (editorLangId == c || editorLangId == cpp)"
       }
     ],
     "menus": {
