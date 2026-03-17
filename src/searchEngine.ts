@@ -9,12 +9,64 @@ function cleanName(name: string): string {
 }
 
 /**
- * Calculates a precise range for a symbol within a line of text.
+ * 從原本的 reference 位置往上回溯，精準定位 LHS 變數在文件中的真實 Range
  */
-function getPreciseSymbolRange(lineText: string, symbol: string, lineNumber: number): vscode.Range {
-    const charOffset = lineText.indexOf(symbol);
-    const startChar = charOffset !== -1 ? charOffset : 0;
-    return new vscode.Range(lineNumber, startChar, lineNumber, startChar + symbol.length);
+function getExactLhsRange(document: vscode.TextDocument, lhs: string, refPos: vscode.Position): vscode.Range {
+    const startLine = Math.max(0, refPos.line - 5);
+    
+    // 從等號右邊所在的行開始往上掃描，尋找 lhs 字串的精確位置
+    for (let line = refPos.line; line >= startLine; line--) {
+        const lineText = document.lineAt(line).text;
+        const charIndex = lineText.indexOf(lhs);
+        
+        if (charIndex !== -1) {
+            // 找到了！回傳精確的起始與結束位置
+            return new vscode.Range(line, charIndex, line, charIndex + lhs.length);
+        }
+    }
+    
+    // 萬一真的找不到 (理論上不會發生)，Fallback 回原本的起始位置
+    return new vscode.Range(refPos.line, 0, refPos.line, lhs.length);
+}
+
+/**
+ * 透過上下文視窗反向解析 LHS (指標名稱)
+ */
+function extractLhsFromContext(document: vscode.TextDocument, refPos: vscode.Position): string | null {
+    // 1. 往前抓取 5 行作為上下文，解決跨行宣告問題
+    const startLine = Math.max(0, refPos.line - 5);
+    const range = new vscode.Range(startLine, 0, refPos.line, refPos.character);
+    let textBlock = document.getText(range);
+
+    // 2. 壓平字串：清除換行符號與多餘空白，消滅多行造成的斷層
+    textBlock = textBlock.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ');
+
+    // 3. 定位等號
+    const eqIndex = textBlock.lastIndexOf('=');
+    if (eqIndex === -1) return null;
+
+    const leftSide = textBlock.substring(0, eqIndex).trim();
+
+    // 4a. 處理片段特徵：C 語言複雜函數指標
+    // 特徵：等號左邊最後一個字元是 ')'，例如 void (*fp)(int, int)
+    if (leftSide.endsWith(')')) {
+        // 這裡只針對已經確認是函數宣告的局部字串做輕量正則萃取
+        const match = leftSide.match(/\(\s*\*\s*([a-zA-Z0-9_]+)\s*\)\s*\([^)]*\)$/);
+        if (match) return match[1];
+    }
+
+    // 4b. 處理片段特徵：一般賦值或結構體初始化
+    // 特徵：結尾是變數名稱，例如 ptr 或 ops.ptr
+    const words = leftSide.split(/[\s,({]+/); // 避開前面的型別或關鍵字
+    const lastWord = words[words.length - 1];
+    
+    // 過濾掉指標的 '&' 或 '*' 符號
+    const cleanWord = lastWord.replace(/[&*]/g, '');
+    if (/^[a-zA-Z0-9_.]+$/.test(cleanWord)) {
+        return cleanWord;
+    }
+
+    return null;
 }
 
 export async function findPointerAssignments(functionName: string, uri: vscode.Uri, position: vscode.Position): Promise<HierarchyItem[]> {
@@ -26,23 +78,21 @@ export async function findPointerAssignments(functionName: string, uri: vscode.U
 
     for (const loc of references) {
         const doc = await vscode.workspace.openTextDocument(loc.uri);
-        const lineText = doc.lineAt(loc.range.start.line).text;
         
-        // Matches "symbol = target" or ".member = target"
-        const assignmentRegex = new RegExp(`(?:^|[\\s,])([\\w.]+)\\s*[:=]\\s*&?\\s*${target}(?![a-zA-Z0-9_])`);
-        const match = lineText.match(assignmentRegex);
+        // 使用上下文解析法萃取 LHS
+        const lhs = extractLhsFromContext(doc, loc.range.start);
 
-        if (match) {
-            const lhs = match[1];
-            const preciseRange = getPreciseSymbolRange(lineText, lhs, loc.range.start.line);
+        if (lhs) {
+            // 替換這裡：使用精準定位取得真實的 Range
+            const exactRange = getExactLhsRange(doc, lhs, loc.range.start);
 
             assignments.push(new HierarchyItem(
                 lhs,
                 lhs,
                 loc.uri,
-                preciseRange,
+                exactRange, // 傳入修正後的精確 Range
                 'assignment',
-                `(Assign) ${lineText.trim()}`
+                `(Assign) ${lhs} = ${target}`
             ));
         }
     }
@@ -81,7 +131,7 @@ export async function findPointerCalls(symbolName: string, uri: vscode.Uri, posi
                     cleanName(containerItem.name),
                     cleanName(containerItem.name),
                     loc.uri,
-                    containerItem.selectionRange,
+                    loc.range,
                     'call',
                     `(Ptr Call) ${refLine}`,
                     containerItem

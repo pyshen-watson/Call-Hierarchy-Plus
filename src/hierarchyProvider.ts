@@ -42,11 +42,15 @@ export class CallHierarchyPlusProvider implements vscode.TreeDataProvider<Hierar
             );
             incoming?.forEach(call => {
                 const name = call.from.name.split('(')[0];
+                const exactCallRange = (call.fromRanges && call.fromRanges.length > 0) 
+                    ? call.fromRanges[0] 
+                    : call.from.selectionRange;
+
                 results.push(new HierarchyItem(
                     name,
                     name,
                     call.from.uri,
-                    call.from.selectionRange,
+                    exactCallRange,
                     'call',
                     call.from.detail,
                     call.from
