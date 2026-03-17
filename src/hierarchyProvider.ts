@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { HierarchyItem } from './models';
-import { findPointerAssignments } from './searchEngine';
+import { findPointerAssignments, findPointerCalls } from './searchEngine';
 
 export class CallHierarchyPlusProvider implements vscode.TreeDataProvider<HierarchyItem> {
     private _onDidChangeTreeData = new vscode.EventEmitter<HierarchyItem | undefined | void>();
@@ -24,38 +24,41 @@ export class CallHierarchyPlusProvider implements vscode.TreeDataProvider<Hierar
 
         const results: HierarchyItem[] = [];
 
-        // --- SOURCE 1: Standard Incoming Calls ---
-        if (element.rawCallItem) {
-            try {
-                const incomingCalls = await vscode.commands.executeCommand<vscode.CallHierarchyIncomingCall[]>(
+        // CASE 1: Node is a Function (Root or standard Call)
+        if (element.type === 'root' || element.type === 'call') {
+            // A. Get standard direct callers
+            if (element.rawCallItem) {
+                const incoming = await vscode.commands.executeCommand<vscode.CallHierarchyIncomingCall[]>(
                     'vscode.provideIncomingCalls',
                     element.rawCallItem
                 );
-                if (incomingCalls) {
-                    incomingCalls.forEach(call => {
-                        results.push(new HierarchyItem(
-                            call.from.name,
-                            call.from.uri,
-                            call.from.selectionRange,
-                            'call',
-                            call.from.detail,
-                            call.from
-                        ));
-                    });
-                }
-            } catch (err) {
-                console.error('Error fetching standard calls:', err);
+                incoming?.forEach(call => {
+                    results.push(new HierarchyItem(
+                        call.from.name,
+                        call.from.name, // symbolName
+                        call.from.uri,
+                        call.from.selectionRange,
+                        'call',
+                        call.from.detail,
+                        call.from
+                    ));
+                });
             }
+
+            // B. Get our custom pointer assignments
+            const assignments = await findPointerAssignments(element.symbolName, element.uri, element.range.start);
+            results.push(...assignments);
         }
 
-        // --- SOURCE 2: Custom Pointer Assignments ---
-        const assignments = await findPointerAssignments(
-            element.label, 
-            element.uri, 
-            element.range.start
-        );
-        results.push(...assignments);
-
+        else if (element.type === 'assignment') {
+            console.log(`[CHP] Traversing pointer caller for: ${element.symbolName}`);
+            const pointerCallers = await findPointerCalls(
+                element.symbolName, 
+                element.uri, 
+                element.range.start
+            );
+            results.push(...pointerCallers);
+        }
         return results;
     }
 }

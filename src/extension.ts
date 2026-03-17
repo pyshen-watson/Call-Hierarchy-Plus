@@ -9,7 +9,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     let disposable = vscode.commands.registerCommand('call-hierarchy-plus.run', async () => {
         const editor = vscode.window.activeTextEditor;
-        if (!editor) return;
+        if (!editor) {return};
 
         const doc = editor.document;
         const pos = editor.selection.active;
@@ -27,6 +27,7 @@ export function activate(context: vscode.ExtensionContext) {
 				const cleanName = items[0].name.split('(')[0].trim();
                 const rootItem = new HierarchyItem(
                     cleanName,
+                    cleanName,
                     items[0].uri,
                     items[0].selectionRange,
                     'root',
@@ -35,11 +36,13 @@ export function activate(context: vscode.ExtensionContext) {
                 );
                 treeProvider.refresh(rootItem);
                 await vscode.commands.executeCommand('chpView.focus');
-            } else if (functionName) {
-                // Fallback: If built-in hierarchy fails, still create a root for our search
+            } 
+			else if (functionName) {
                 console.log(`[CHP] Built-in hierarchy failed. Using fallback for ${functionName}`);
+				const cleanName = functionName.split('(')[0].trim();
                 const fallbackRoot = new HierarchyItem(
-                    functionName,
+                    cleanName,      // label
+                    cleanName,      // symbolName
                     doc.uri,
                     wordRange!,
                     'root',
@@ -47,10 +50,12 @@ export function activate(context: vscode.ExtensionContext) {
                 );
                 treeProvider.refresh(fallbackRoot);
                 await vscode.commands.executeCommand('chpView.focus');
-            } else {
+            } 
+			else {
                 vscode.window.showErrorMessage('Please place cursor on a function name.');
             }
-        } catch (err) {
+        } 
+		catch (err) {
             console.error('CHP Command Error:', err);
         }
     });
