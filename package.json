@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "publisher": "pyshen",
   "repository": "https://github.com/pyshen-watson/Call-Hierarchy-Plus",
-  "icon": "",
+  "icon": "media/sidebar-icon.png",
   "engines": {
     "vscode": "^1.106.0"
   },
