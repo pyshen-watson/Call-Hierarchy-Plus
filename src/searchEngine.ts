@@ -117,33 +117,34 @@ export async function findPointerCalls(symbolName: string, uri: vscode.Uri, posi
     const references = await vscode.commands.executeCommand<vscode.Location[]>('vscode.executeReferenceProvider', uri, searchPos);
     if (!references) return [];
 
-    const callRegex = new RegExp(`(?:\\.|->|\\b)${targetSymbol}\\s*\\(`);
+    const callRegex = new RegExp(`^(?:\\.|->)?${targetSymbol}\\s*(?:\\)\\s*)?\\(`);
 
     for (const loc of references) {
-        const refDoc = await vscode.workspace.openTextDocument(loc.uri);
-        
+            const refDoc = await vscode.workspace.openTextDocument(loc.uri);
+            
         // Context window of 3 lines to handle multi-line arguments
-        const endLine = Math.min(refDoc.lineCount - 1, loc.range.start.line + 3);
-        const contextRange = new vscode.Range(loc.range.start.line, 0, endLine, 1000);
-        let contextText = refDoc.getText(contextRange);
-        
-        contextText = contextText.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ');
+            const endLine = Math.min(refDoc.lineCount - 1, loc.range.start.line + 3);
+            const contextRange = new vscode.Range(loc.range.start, new vscode.Position(endLine, 1000));
+            let contextText = refDoc.getText(contextRange);
+            
+            contextText = contextText.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ');
 
         if (callRegex.test(contextText)) {
-            const containerItem = await getEnclosingFunction(loc.uri, loc.range.start);
-            if (containerItem) {
-                callers.push(new HierarchyItem(
-                    cleanName(containerItem.name),
-                    cleanName(containerItem.name),
-                    loc.uri,
-                    loc.range,
-                    'call',
-                    `(Ptr Call) ${contextText.substring(0, 60).trim()}...`,
-                    containerItem
-                ));
+                const containerItem = await getEnclosingFunction(loc.uri, loc.range.start);
+                if (containerItem) {
+                    const displayLine = refDoc.lineAt(loc.range.start.line).text.trim();
+                    callers.push(new HierarchyItem(
+                        cleanName(containerItem.name),
+                        cleanName(containerItem.name),
+                        loc.uri,
+                        loc.range,
+                        'call',
+                        `(Ptr Call) ${displayLine.substring(0, 60)}...`,
+                        containerItem
+                    ));
+                }
             }
         }
-    }
     return callers;
 }
 

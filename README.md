@@ -30,3 +30,6 @@ The native VS Code Call Hierarchy often breaks when it encounters function point
 * Initial release!
 * Support for tracing global, local, and struct function pointers.
 * Added multi-line context window for complex macro and pointer assignments.
+
+### 1.0.1
+* Fix considering expression is a calling problem

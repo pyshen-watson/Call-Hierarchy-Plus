@@ -2,7 +2,7 @@
   "name": "call-hierarchy-plus",
   "displayName": "Call Hierarchy Plus (CHP)",
   "description": "Enhanced call hierarchy for C/C++ projects. Bridges the gap between direct function calls and indirect pointer assignments/callbacks.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "pyshen",
   "repository": {
     "type": "git",
@@ -10,7 +10,7 @@
   },
   "icon": "media/sidebar-icon.png",
   "engines": {
-    "vscode": "^1.106.0"
+    "vscode": "^1.64.0"
   },
   "categories": [
     "Programming Languages",
@@ -96,7 +96,7 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.106.0",
+    "@types/vscode": "^1.64.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
     "typescript-eslint": "^8.56.1",
