@@ -1,71 +1,32 @@
-# trace-caller README
+# Call Hierarchy Plus (CHP)
 
-This is the README for your extension "trace-caller". After writing up a brief description, we recommend including the following sections.
+Call Hierarchy Plus is an enhanced Call Hierarchy extension for VS Code, specifically designed for C/C++ developers working on complex firmware (such as SoC development). It bridges the gap between direct function calls and indirect pointer assignments/callbacks.
 
-## Features
+## 📌 Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+The native VS Code Call Hierarchy often breaks when it encounters function pointers. CHP solves this by establishing a complete logic chain: **Function Definition ➔ Pointer Assignment ➔ Pointer Invocation**.
 
-For example if there is an image subfolder under your extension project workspace:
+* **Function Pointer Tracking**: Seamlessly tracks through global variables, struct initializations, and local variables.
+* **Complex Declarations**: Supports cross-line complex declarations (e.g., `void (*fp)(int) = target`).
+* **Struct Member Invocations**: Precisely parses and tracks struct member calls like `ops.on_rx(data)`.
+* **Deep Context Parsing**: Uses a multiline context window to accurately identify assignments even when arguments span multiple lines.
 
-\!\[feature X\]\(images/feature-x.png\)
+## 🚀 Usage
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+1.  Place your cursor on a function or function pointer in a C/C++ file.
+2.  Press `Ctrl+Shift+C` (or `Cmd+Shift+C` on macOS) to run Call Hierarchy Plus.
+3.  The **Call Hierarchy Plus** view will open in the sidebar, displaying the complete call chain.
+4.  Click on any node to navigate directly to the exact line of the function call or assignment.
 
-## Requirements
+## 🛠️ Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+* This extension is designed to work with C and C++ projects.
+* It relies on the built-in C/C++ language features of VS Code (ensure you have the official Microsoft C/C++ extension installed and configured).
 
-## Extension Settings
-
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
+## 📝 Release Notes
 
 ### 1.0.0
 
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+* Initial release!
+* Support for tracing global, local, and struct function pointers.
+* Added multi-line context window for complex macro and pointer assignments.
