@@ -13,19 +13,18 @@ function cleanName(name: string): string {
  */
 function getExactLhsRange(document: vscode.TextDocument, lhs: string, refPos: vscode.Position): vscode.Range {
     const startLine = Math.max(0, refPos.line - 5);
+
+    // 🚀 加入 \b 單字邊界防護：避免 indexOf 誤將 RHS 的前綴當作 LHS
+    const regex = new RegExp(`\\b${lhs}\\b`);
     
-    // 從等號右邊所在的行開始往上掃描，尋找 lhs 字串的精確位置
     for (let line = refPos.line; line >= startLine; line--) {
         const lineText = document.lineAt(line).text;
-        const charIndex = lineText.indexOf(lhs);
+        const match = lineText.match(regex);
         
-        if (charIndex !== -1) {
-            // 找到了！回傳精確的起始與結束位置
-            return new vscode.Range(line, charIndex, line, charIndex + lhs.length);
+        if (match && match.index !== undefined) {
+            return new vscode.Range(line, match.index, line, match.index + lhs.length);
         }
     }
-    
-    // 萬一真的找不到 (理論上不會發生)，Fallback 回原本的起始位置
     return new vscode.Range(refPos.line, 0, refPos.line, lhs.length);
 }
 
@@ -116,13 +115,14 @@ export async function findPointerCalls(symbolName: string, uri: vscode.Uri, posi
     const doc = await vscode.workspace.openTextDocument(uri);
     const lineText = doc.lineAt(position.line).text;
     
-    // Shift position forward by 1 if it's a member to skip the '.' for IntelliSense accuracy
-    const symbolOffset = lineText.indexOf(symbolName);
-    const searchPos = (isMember && symbolOffset !== -1) 
-        ? new vscode.Position(position.line, symbolOffset + 1) 
-        : position;
-
-    console.log(`[CHP:Bridge] Searching pointer calls for: ${targetSymbol}`);
+    // 🚀 防護網：確保尋找引用時的起點，是獨立的單字，而不是某個長變數的前綴
+    const exactWordRegex = new RegExp(`\\b${targetSymbol}\\b`);
+    const match = lineText.match(exactWordRegex);
+    
+    let searchPos = position;
+    if (match && match.index !== undefined) {
+        searchPos = new vscode.Position(position.line, match.index + (isMember ? 1 : 0));
+    }
 
     const references = await vscode.commands.executeCommand<vscode.Location[]>('vscode.executeReferenceProvider', uri, searchPos);
     if (!references) return [];
@@ -131,9 +131,16 @@ export async function findPointerCalls(symbolName: string, uri: vscode.Uri, posi
 
     for (const loc of references) {
         const refDoc = await vscode.workspace.openTextDocument(loc.uri);
-        const refLine = refDoc.lineAt(loc.range.start.line).text.trim();
+        
+        // 🚀 建立上下文視窗：往下抓取 3 行，涵蓋 Link Layer 超長參數導致的跨行呼叫
+        const endLine = Math.min(refDoc.lineCount - 1, loc.range.start.line + 3);
+        const contextRange = new vscode.Range(loc.range.start.line, 0, endLine, 1000);
+        let contextText = refDoc.getText(contextRange);
+        
+        // 壓平字串，消滅換行符號帶來的 Regex 斷層
+        contextText = contextText.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ');
 
-        if (callRegex.test(refLine)) {
+        if (callRegex.test(contextText)) {
             const containerItem = await getEnclosingFunction(loc.uri, loc.range.start);
             if (containerItem) {
                 callers.push(new HierarchyItem(
@@ -142,7 +149,7 @@ export async function findPointerCalls(symbolName: string, uri: vscode.Uri, posi
                     loc.uri,
                     loc.range,
                     'call',
-                    `(Ptr Call) ${refLine}`,
+                    `(Ptr Call) ${contextText.substring(0, 60).trim()}...`,
                     containerItem
                 ));
             }
