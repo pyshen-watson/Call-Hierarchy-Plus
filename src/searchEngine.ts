@@ -40,34 +40,45 @@ export async function findPointerAssignments(functionName: string, uri: vscode.U
     return assignments;
 }
 
-// src/searchEngine.ts 中的 findPointerCalls
-
 export async function findPointerCalls(symbolName: string, uri: vscode.Uri, position: vscode.Position): Promise<HierarchyItem[]> {
     const callers: HierarchyItem[] = [];
-    const cleanSymbol = symbolName.startsWith('.') ? symbolName.substring(1) : symbolName;
     
-    // 直接使用傳入的精確位置 (已經在 findPointerAssignments 中算好了)
-    console.log(`[CHP Bridge] Precisely searching for: ${cleanSymbol} at line ${position.line + 1}`);
+    // 1. 判斷是否為成員 (以 . 開頭)
+    const isMember = symbolName.startsWith('.');
+    const cleanSymbol = isMember ? symbolName.substring(1) : symbolName;
+    
+    const doc = await vscode.workspace.openTextDocument(uri);
+    const lineText = doc.lineAt(position.line).text;
+    
+    // 2. 精確定位：如果是成員則跳過 "."，如果是全域變數則保持原位
+    let symbolOffset = lineText.indexOf(symbolName);
+    if (isMember && symbolOffset !== -1) {
+        symbolOffset += 1; 
+    }
+    
+    const precisePos = symbolOffset !== -1 ? new vscode.Position(position.line, symbolOffset) : position;
+
+    console.log(`[CHP Bridge] Searching calls for: ${cleanSymbol} at ${precisePos.line}:${precisePos.character}`);
 
     const references = await vscode.commands.executeCommand<vscode.Location[]>(
-        'vscode.executeReferenceProvider', 
-        uri, 
-        position 
+        'vscode.executeReferenceProvider', uri, precisePos
     );
 
-    if (!references || references.length === 0) {
-        console.log(`[CHP Bridge] Still 0 references. Trying fallback: document search...`);
-        // 這裡可以加入一個簡單的字串搜尋作為備案，但我們先解決 API 座標問題
-        return [];
-    }
+    if (!references || references.length === 0) return [];
 
     for (const loc of references) {
-        const doc = await vscode.workspace.openTextDocument(loc.uri);
-        const lineText = doc.lineAt(loc.range.start.line).text.trim();
+        const refDoc = await vscode.workspace.openTextDocument(loc.uri);
+        const refLine = refDoc.lineAt(loc.range.start.line).text.trim();
 
-        // 檢查是否為執行語句: symbolName(...)
-        const callRegex = new RegExp(`\\b${cleanSymbol}\\s*\\(`);
-        if (callRegex.test(lineText)) {
+        /**
+         * 3. 終極 Regex：
+         * (?:\\.|->|\\b) 
+         * 代表：前面可以是 "." 或 "->" 或 "單字邊界 (Word Boundary)"
+         * 這樣就能同時匹配 realtek_ops.on_rx( 或是 g_bt_callback(
+         */
+        const callRegex = new RegExp(`(?:\\.|->|\\b)${cleanSymbol}\\s*\\(`);
+
+        if (callRegex.test(refLine)) {
             const containerItem = await getEnclosingFunction(loc.uri, loc.range.start);
             if (containerItem) {
                 callers.push(new HierarchyItem(
@@ -76,7 +87,7 @@ export async function findPointerCalls(symbolName: string, uri: vscode.Uri, posi
                     loc.uri,
                     containerItem.selectionRange,
                     'call',
-                    `(Ptr Call) ${lineText}`,
+                    `(Call) ${refLine}`,
                     containerItem
                 ));
             }
@@ -84,6 +95,7 @@ export async function findPointerCalls(symbolName: string, uri: vscode.Uri, posi
     }
     return callers;
 }
+
 
 // 輔助函式：尋找包裹該位置的函式
 async function getEnclosingFunction(uri: vscode.Uri, position: vscode.Position): Promise<vscode.CallHierarchyItem | null> {
